@@ -1,0 +1,53 @@
+{
+  "schema": "1.0",
+  "components": {
+    "main-container": {
+      "type": "Box",
+      "file": "src/App.tsx",
+      "props": {
+        "size": 400,
+        "bgColor": "#dbe6ff",
+        "borderRadius": 30,
+        "hasBorder": true,
+        "borderColor": "#5236dd",
+        "borderWidth": 4,
+        "opacity": 100
+      }
+    },
+    "header-icon": {
+      "type": "IconBox",
+      "file": "src/App.tsx",
+      "props": {
+        "size": 250,
+        "bgColor": "#4d3128",
+        "borderRadius": 0,
+        "hasBorder": true,
+        "borderColor": "#000000",
+        "borderWidth": 2,
+        "opacity": 95,
+        "iconEmoji": "🎨",
+        "iconSize": 48,
+        "iconColor": "#FFFFFF",
+        "iconOpacity": 100
+      }
+    },
+    "subtitle-text": {
+      "type": "TextBox",
+      "file": "src/App.tsx",
+      "props": {
+        "size": 120,
+        "bgColor": "#dc1e1e",
+        "borderRadius": 4,
+        "hasBorder": false,
+        "borderColor": "#000000",
+        "borderWidth": 2,
+        "opacity": 66,
+        "fontSize": 24,
+        "fontFamily": "sans-serif",
+        "textColor": "#333333",
+        "fontWeight": 400,
+        "textAlign": "center"
+      }
+    }
+  }
+}

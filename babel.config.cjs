@@ -4,37 +4,45 @@ module.exports = {
     function liveEditAnnotate({ types: t }) {
       return {
         visitor: {
-          JSXOpeningElement(path, state) {
+          JSXOpeningElement(path) {
             const isDev = process.env.NODE_ENV !== 'production';
             if (!isDev) return;
 
-            const filename = state.file?.opts?.filename || 'unknown';
-            // Normalize Windows paths to use forward slashes
-            const normalizedFilename = filename.replace(/\\/g, '/');
-            
-            const tagName = path.node.name;
-            const nameStr = t.isJSXIdentifier(tagName) ? tagName.name : null;
-            if (!nameStr) return;
-
-            // Inject an id (tagName:line:column) and file pointer
-            const start = path.node.loc?.start || { line: 0, column: 0 };
-            const id = `${nameStr}:${start.line}:${start.column}`;
-
-            const hasId = path.node.attributes.some(
-              (a) => t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: "data-le-id" })
+            const leIdAttr = path.node.attributes.find(
+              (a) =>
+                t.isJSXAttribute(a) &&
+                t.isJSXIdentifier(a.name) &&
+                a.name.name === 'leId'
             );
-            if (!hasId) {
-              path.node.attributes.push(
-                t.jsxAttribute(t.jsxIdentifier("data-le-id"), t.stringLiteral(id))
-              );
+
+            if (!leIdAttr) return;
+
+            let leIdValue = '';
+            if (
+              leIdAttr.value &&
+              t.isStringLiteral(leIdAttr.value)
+            ) {
+              leIdValue = leIdAttr.value.value;
+            } else if (
+              leIdAttr.value &&
+              t.isJSXExpressionContainer(leIdAttr.value) &&
+              t.isStringLiteral(leIdAttr.value.expression)
+            ) {
+              leIdValue = leIdAttr.value.expression.value;
             }
 
-            const hasFile = path.node.attributes.some(
-              (a) => t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: "data-le-file" })
+            if (!leIdValue) return;
+
+            const hasDataLeId = path.node.attributes.some(
+              (a) =>
+                t.isJSXAttribute(a) &&
+                t.isJSXIdentifier(a.name) &&
+                a.name.name === 'data-le-id'
             );
-            if (!hasFile) {
+
+            if (!hasDataLeId) {
               path.node.attributes.push(
-                t.jsxAttribute(t.jsxIdentifier("data-le-file"), t.stringLiteral(normalizedFilename))
+                t.jsxAttribute(t.jsxIdentifier('data-le-id'), t.stringLiteral(leIdValue))
               );
             }
           }

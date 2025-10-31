@@ -1,0 +1,68 @@
+import { EditableComponentDef } from './types';
+
+export const BoxDef: EditableComponentDef = {
+  name: 'Box',
+  label: 'Base Box',
+  properties: {
+    size: {
+      type: 'number',
+      label: 'Size',
+      defaultValue: 100,
+      min: 10,
+      max: 500,
+      step: 5,
+      unit: 'px',
+      category: 'layout',
+    },
+    bgColor: {
+      type: 'color',
+      label: 'Background Color',
+      defaultValue: '#4CAF50',
+      category: 'appearance',
+    },
+    borderRadius: {
+      type: 'number',
+      label: 'Border Radius',
+      defaultValue: 8,
+      min: 0,
+      max: 50,
+      step: 2,
+      unit: 'px',
+      category: 'appearance',
+    },
+    hasBorder: {
+      type: 'boolean',
+      label: 'Show Border',
+      defaultValue: false,
+      category: 'appearance',
+    },
+    borderColor: {
+      type: 'color',
+      label: 'Border Color',
+      defaultValue: '#000000',
+      category: 'appearance',
+      condition: (vals) => vals.hasBorder === true,
+    },
+    borderWidth: {
+      type: 'number',
+      label: 'Border Width',
+      defaultValue: 2,
+      min: 1,
+      max: 10,
+      step: 1,
+      unit: 'px',
+      category: 'appearance',
+      condition: (vals) => vals.hasBorder === true,
+    },
+    opacity: {
+      type: 'number',
+      label: 'Opacity',
+      defaultValue: 100,
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '%',
+      category: 'appearance',
+    },
+  },
+};
