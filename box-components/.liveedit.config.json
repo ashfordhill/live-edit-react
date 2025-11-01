@@ -7,10 +7,10 @@
       "props": {
         "size": 400,
         "bgColor": "#dbe6ff",
-        "borderRadius": 30,
+        "borderRadius": 46,
         "hasBorder": true,
         "borderColor": "#5236dd",
-        "borderWidth": 4,
+        "borderWidth": 1,
         "opacity": 100
       }
     },
