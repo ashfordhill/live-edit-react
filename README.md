@@ -1,6 +1,6 @@
 # Live Edit React
 
-## V2
+## V2 Box Components
 
 - Instead of directly editing props of the component with `line:col` style in the file (was fragile), uses `.liveedit.config.json` to store the editable props instead, which the component uses to render.
 - Uses inheritance (Box and children TextBox and IconBox) to avoid needing unique props and menus for each component type.
@@ -10,18 +10,18 @@
 - This would require developers to make sure they use unique `leId` or key, whatever for each 'live edit component'. `.liveedit.config.json` could grow quite big if you had even just dozens of these types of components. Definitely not worth it for the features provided currently, imo.
 
 <div align="center" style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap;">
-  <img src="docs/v2/liveconfig.png" alt="LIVE_CONFIG" width="850" style="margin:0 8px;" />
-  <img src="docs/v2/menu.gif" alt="MENU" width="850" style="margin:0 8px;" />
+  <img src="box-components/docs/v2/liveconfig.png" alt="LIVE_CONFIG" width="850" style="margin:0 8px;" />
+  <img src="box-components/docs/v2/menu.gif" alt="MENU" width="850" style="margin:0 8px;" />
 </div>
 
 ---
 ---
 
-## V1
+## V1 Box Components
 
 <div align="center" style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap;">
-  <img src="docs/v1/circle.gif" alt="EXAMPLE_CIRCLE" width="425" style="margin:0 8px;" />
-  <img src="docs/v1/textbox.gif" alt="EXAMPLE_TEXTBOX" width="425" style="margin:0 8px;" />
+  <img src="box-components/docs/v1/circle.gif" alt="EXAMPLE_CIRCLE" width="425" style="margin:0 8px;" />
+  <img src="box-components/docs/v1/textbox.gif" alt="EXAMPLE_TEXTBOX" width="425" style="margin:0 8px;" />
 </div>
 
 ---
