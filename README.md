@@ -9,11 +9,14 @@ Therefore refreshing the page, restarting app, etc. will keep changes ofc.
 
 Doesn't currently have a production 'baked in' mode but that would be necessary.
 
-![](./grid-components/docs/grid-layout.png)
-
 <div align="center" style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap;">
-  <img src="grid-components/docs/grid-combine-and-orientation.gif" width="850" style="margin:0 8px;" />
-  <img src="grid-components/docs/grid-view-edit-modes.gif" width="850" style="margin:0 8px;" />
+  <h2>Create Nested Grids</h2>
+  <img src="grid-components/docs/grid-combine.gif" width="600" style="margin:0 8px;" />
+  <h2>Row/Horizontal vs Column/Vertical Orientation</h2>
+  <img src="grid-components/docs/grid-orientation.gif" width="600" style="margin:0 8px;" />
+
+  <h2>Edit Mode vs Actual View</h2>
+  <img src="grid-components/docs/grid-view-edit-modes.gif" width="600" style="margin:0 8px;" />
 </div>
 
 - Needs following fixes/improvements:
