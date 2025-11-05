@@ -1,0 +1,105 @@
+{
+  "schema": "1.0",
+  "components": {
+    "main-grid": {
+      "type": "Grid",
+      "file": "src/App.tsx",
+      "props": {
+        "cols": 4,
+        "rowHeight": 120,
+        "layout": [
+          {
+            "i": "item-1762301792055-1",
+            "x": 0,
+            "y": 0,
+            "w": 4,
+            "h": 1,
+            "childIndex": 0
+          },
+          {
+            "i": "nested-1762302061867",
+            "x": 0,
+            "y": 1,
+            "w": 4,
+            "h": 3,
+            "nested": {
+              "items": [
+                {
+                  "i": "item-1762301792055-0-n",
+                  "x": 0,
+                  "y": 1,
+                  "w": 1,
+                  "h": 1,
+                  "childIndex": 5
+                },
+                {
+                  "i": "item-1762302046406-0-n",
+                  "x": 0,
+                  "y": 0,
+                  "w": 2,
+                  "h": 1,
+                  "childIndex": 2
+                },
+                {
+                  "i": "item-1762302046406-1-n-1762302064269",
+                  "x": 0,
+                  "y": 2,
+                  "w": 1,
+                  "h": 1,
+                  "childIndex": 3
+                }
+              ],
+              "cols": 2,
+              "compactType": "horizontal"
+            }
+          },
+          {
+            "i": "item-1762303020166-2",
+            "x": 0,
+            "y": 4,
+            "w": 4,
+            "h": 1,
+            "childIndex": 1
+          },
+          {
+            "i": "nested-1762303038694",
+            "x": 1,
+            "y": 5,
+            "w": 1,
+            "h": 4,
+            "nested": {
+              "items": [
+                {
+                  "i": "item-1762303020166-1-n",
+                  "x": 0,
+                  "y": 0,
+                  "w": 1,
+                  "h": 1,
+                  "childIndex": 4
+                },
+                {
+                  "i": "item-1762303020166-0-n",
+                  "x": 0,
+                  "y": 1,
+                  "w": 1,
+                  "h": 1,
+                  "childIndex": 6
+                },
+                {
+                  "i": "item-default-7-n-1762303040427",
+                  "x": 0,
+                  "y": 2,
+                  "w": 1,
+                  "h": 1,
+                  "childIndex": 7
+                }
+              ],
+              "cols": 2,
+              "compactType": "vertical"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,5 +1,31 @@
 # Live Edit React
 
+## V3 Grid Layout
+
+Edit the layout of child components without poking around Grid/Box code to get layouts as visually desired.
+
+Another live edit component, the interactions with the UI will update the `.liveedit.config.json` which will cause hot reloading to reflect the changes.
+Therefore refreshing the page, restarting app, etc. will keep changes ofc.
+
+Doesn't currently have a production 'baked in' mode but that would be necessary.
+
+![](./grid-components/docs/grid-layout.png)
+
+<div align="center" style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap;">
+  <img src="grid-components/docs/grid-combine-and-orientation.gif" width="850" style="margin:0 8px;" />
+  <img src="grid-components/docs/grid-view-edit-modes.gif" width="850" style="margin:0 8px;" />
+</div>
+
+- Needs following fixes/improvements:
+  - Address desired padding in edit vs view mode, and configuring the padding changes. Perhaps try adding padding as a uniform, per 'parent Grid' configurable instead of per component child.
+  - In the edit mode, if a component doesn't fit well within its cell it just gets cut off I guess? 
+  - Maybe have an 'empty block' option to add if someone wants to get a layout just right with empty spaces/gaps that are too large for padding and margin edits. idk
+  - Dragging around is weird with 0 collisions on the grid possible, kind of hard to get something in the 'right' spot
+  - Lot more. Much jank.  
+
+---
+---
+
 ## V2 Box Components
 
 - Instead of directly editing props of the component with `line:col` style in the file (was fragile), uses `.liveedit.config.json` to store the editable props instead, which the component uses to render.
