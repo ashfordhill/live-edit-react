@@ -207,12 +207,14 @@ export function App() {
           <div style={{ fontWeight: 600, color: darkMode ? '#f9fafb' : '#1f2937', marginBottom: '8px', transition: 'color 0.3s' }}>💡 Tips:</div>
           <ul style={{ margin: 0, paddingLeft: '20px' }}>
             <li>Click and drag the center area to move items (avoid corners for resizing)</li>
-            <li>Resize by dragging from the <strong>bottom-right corner</strong> handle</li>
+            <li>Resize by dragging from the <strong>bottom-right pink corner</strong> handle</li>
             <li>Drop one component on another to create a nested grid (shows 📂 icon)</li>
+            <li>Use <strong>🔼/🔽 Root Pad</strong> buttons (top-right) to adjust main grid padding</li>
+            <li>Use <strong>🔼/🔽 Pad</strong> buttons to adjust padding inside parent grids</li>
             <li>Click "✕ Uncombine" button on nested grids to extract items</li>
             <li>Double right-click to toggle between vertical/horizontal layout modes</li>
             <li>Active nested grids show a highlighted border</li>
-            <li>Switch to View Mode to see the final clean layout without grid outlines</li>
+            <li>Switch to View Mode to see the final clean layout</li>
           </ul>
         </div>
       )}

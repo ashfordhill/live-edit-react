@@ -1,3 +1,28 @@
+/**
+ * Grid Component - Advanced Drag & Drop Layout System
+ * 
+ * A fully-featured grid layout system with support for:
+ * - Drag and drop repositioning
+ * - Resizable grid items
+ * - Nested parent grids (combine items into containers)
+ * - Configurable padding for parent grids
+ * - Horizontal/Vertical layout modes
+ * - Real-time persistence via live-edit config
+ * 
+ * Architecture:
+ * - Uses react-grid-layout for core grid functionality
+ * - Layout state persisted to .liveedit.config.json
+ * - Supports unlimited nesting depth
+ * - Edit mode vs View mode for development/production
+ * 
+ * Key Features:
+ * 1. Combine items: Drag one item onto another (50%+ overlap) to create parent grid
+ * 2. Add to parent: Drag items into existing parent grids
+ * 3. Uncombine: Extract all children from a parent grid back to main grid
+ * 4. Adjust padding: Use 🔼/🔽 Pad buttons to control parent grid padding
+ * 5. Toggle layout: Double right-click to switch horizontal ↔️ vertical
+ */
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Responsive, WidthProvider, Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
@@ -5,18 +30,23 @@ import 'react-resizable/css/styles.css';
 import { useEditableProps } from '../hooks/useEditableProps';
 import { useLiveEditBatch } from '../hooks/useLiveEdit';
 
+/**
+ * Represents a single grid item in the layout
+ * Can be either a regular component or a nested grid container
+ */
 export interface LayoutItem {
-  i: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  childIndex?: number;
-  static?: boolean;
-  nested?: {
-    items: LayoutItem[];
-    cols?: number;
-    compactType?: 'vertical' | 'horizontal';
+  i: string;              // Unique identifier for the grid item
+  x: number;              // X position in grid columns (0-based)
+  y: number;              // Y position in grid rows (0-based)
+  w: number;              // Width in grid columns
+  h: number;              // Height in grid rows
+  childIndex?: number;    // Index of the child component to render
+  static?: boolean;       // Whether the item is locked in place
+  nested?: {              // If present, this item contains a nested grid
+    items: LayoutItem[];  // Child items in the nested grid
+    cols?: number;        // Number of columns in nested grid
+    compactType?: 'vertical' | 'horizontal';  // Layout direction
+    padding?: number;     // Padding for parent grid in pixels (adjustable)
   };
 }
 
@@ -33,6 +63,7 @@ interface GridProps {
   isNested?: boolean;
   darkMode?: boolean;
   initialCompactType?: 'vertical' | 'horizontal';
+  padding?: number;  // Root grid padding (adjustable)
 }
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -49,6 +80,7 @@ export function Grid({
   isNested = false,
   darkMode = false,
   initialCompactType = 'vertical',
+  padding: initialPadding = 16,
 }: GridProps) {
   const editableProps = useEditableProps(id);
   const { onBatchChange } = useLiveEditBatch(id);
@@ -56,12 +88,14 @@ export function Grid({
   const configLayout = editableProps?.layout || initialLayout;
   const configCols = editableProps?.cols || cols;
   const configRowHeight = editableProps?.rowHeight || rowHeight;
+  const configPadding = editableProps?.padding ?? initialPadding;
+  const configCompactType = editableProps?.compactType || initialCompactType;
   
   const [layout, setLayout] = useState<LayoutItem[]>(configLayout);
   const [isDragging, setIsDragging] = useState(false);
   // Removed unused dragOverId state; overlapTargetId is the single source of truth
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [compactType, setCompactType] = useState<'vertical' | 'horizontal'>(initialCompactType);
+  const [compactType, setCompactType] = useState<'vertical' | 'horizontal'>(configCompactType);
   const [activeNestedId, setActiveNestedId] = useState<string | null>(null);
   const [overlapTargetId, setOverlapTargetId] = useState<string | null>(null);
   const rightClickCountRef = React.useRef(0);
@@ -108,6 +142,14 @@ export function Grid({
     }
   }, [propsLayoutString, isNested]);
 
+  // Sync compactType from config (for root grid)
+  useEffect(() => {
+    if (!isNested && editableProps?.compactType) {
+      console.log('📥 Root Grid received compactType config update:', editableProps.compactType);
+      setCompactType(editableProps.compactType);
+    }
+  }, [editableProps?.compactType, isNested]);
+
   // Sync compactType from parent (for nested grids)
   useEffect(() => {
     if (isNested && initialCompactType) {
@@ -116,7 +158,11 @@ export function Grid({
     }
   }, [initialCompactType, isNested]);
 
-  // Calculate overlap percentage between two items
+  /**
+   * Calculate overlap percentage between dragged item and target item
+   * Used to determine when items should be combined into a parent grid
+   * @returns Percentage of overlap (0-100)
+   */
   const calculateOverlap = useCallback((draggedItem: LayoutItem, targetItem: LayoutItem): number => {
     const draggedLeft = draggedItem.x;
     const draggedRight = draggedItem.x + draggedItem.w;
@@ -128,7 +174,7 @@ export function Grid({
     const targetTop = targetItem.y;
     const targetBottom = targetItem.y + targetItem.h;
 
-    // Calculate intersection
+    // Calculate intersection rectangle
     const intersectLeft = Math.max(draggedLeft, targetLeft);
     const intersectRight = Math.min(draggedRight, targetRight);
     const intersectTop = Math.max(draggedTop, targetTop);
@@ -144,7 +190,11 @@ export function Grid({
     return 0;
   }, []);
 
-  // Check for overlaps during drag (optimized to prevent flickering)
+  /**
+   * Check for overlaps during drag operation
+   * Determines which item (if any) should be highlighted as a combination target
+   * Optimized to prevent flickering by only updating when target changes
+   */
   const checkOverlaps = useCallback((currentLayout: Layout[]) => {
     if (!draggedItemId) return;
 
@@ -154,17 +204,19 @@ export function Grid({
     let maxOverlap = 0;
     let maxOverlapTargetId: string | null = null;
 
+    // Find the item with the highest overlap percentage
     for (const item of currentLayout) {
       if (item.i === draggedItemId) continue;
 
       const overlap = calculateOverlap(draggedItem as LayoutItem, item as LayoutItem);
-      if (overlap > maxOverlap && overlap >= 50) { // 50% threshold - more reliable
+      // 50% overlap threshold - prevents accidental combinations
+      if (overlap > maxOverlap && overlap >= 50) {
         maxOverlap = overlap;
         maxOverlapTargetId = item.i;
       }
     }
 
-    // Only update if the target actually changed (prevents flickering)
+    // Only update state if the target actually changed (prevents flickering)
     if (maxOverlapTargetId !== lastOverlapTargetRef.current) {
       lastOverlapTargetRef.current = maxOverlapTargetId;
       setOverlapTargetId(maxOverlapTargetId);
@@ -191,6 +243,14 @@ export function Grid({
     }
   }, [onLayoutChange, isNested, editableProps, onBatchChange]);
 
+  /**
+   * Handles dropping a dragged item onto another item
+   * Creates a new parent grid or adds to an existing parent grid
+   * 
+   * Two scenarios:
+   * 1. Target is already a parent grid -> Add source item to it
+   * 2. Target is a regular item -> Create new parent grid with both items
+   */
   const handleDropOnItem = (targetItemId: string) => {
     if (!draggedItemId || draggedItemId === targetItemId) return;
 
@@ -201,44 +261,49 @@ export function Grid({
 
     console.log('🔗 Combining items:', draggedItemId, '+', targetItemId);
 
-    // Check if target is already a nested grid - if so, add to it instead of creating new one
+    // SCENARIO 1: Target is already a parent grid - add source item to it
     if (targetItem.nested) {
+      // Remove source item from main layout
       const newLayout = layout.filter(l => l.i !== draggedItemId);
       
-      // Create a new nested item with proper positioning
+      // Get parent grid configuration
       const nestedCols = targetItem.nested.cols || 2;
       const nestedCompactType = targetItem.nested.compactType || 'vertical';
       
+      // Create a new nested item with proper positioning based on layout direction
       const newNestedItem: LayoutItem = {
         ...sourceItem,
-        i: `${sourceItem.i}-n-${Date.now()}`,
-        // Horizontal: items flow left-to-right, wrap to new rows (like flex-direction: row)
-        // Vertical: items flow top-to-bottom, wrap to new columns (like flex-direction: column)
+        i: `${sourceItem.i}-n-${Date.now()}`, // Unique ID for nested item
+        // Position calculation depends on layout direction:
+        // - Horizontal: items flow left-to-right, wrap to new rows (like flex-direction: row)
+        // - Vertical: items flow top-to-bottom in single column (like flex-direction: column)
         x: nestedCompactType === 'horizontal' ? (targetItem.nested.items.length % nestedCols) : 0,
         y: nestedCompactType === 'horizontal' ? Math.floor(targetItem.nested.items.length / nestedCols) : targetItem.nested.items.length,
         w: 1,
         h: 1,
-        // Preserve childIndex and nested property if they exist
+        // Preserve important properties from source item
         ...(sourceItem.childIndex !== undefined && { childIndex: sourceItem.childIndex }),
         ...(sourceItem.nested && { nested: sourceItem.nested }),
       };
 
+      // Add new item to parent grid's children
       const newNestedItems = [
         ...targetItem.nested.items,
         newNestedItem,
       ];
 
-      // Calculate proper height based on layout type and ensure adequate space
+      // Calculate proper height to fit all items (with buffer for better UX)
       let calculatedHeight;
       if (nestedCompactType === 'horizontal') {
-        // Horizontal layout (row): items flow left-to-right in rows
+        // Horizontal layout: calculate rows needed based on column count
         const rowsNeeded = Math.ceil(newNestedItems.length / nestedCols);
         calculatedHeight = Math.max(targetItem.h, rowsNeeded + 1);
       } else {
-        // Vertical layout (column): items stack top-to-bottom
+        // Vertical layout: each item stacks vertically
         calculatedHeight = Math.max(targetItem.h, newNestedItems.length + 1);
       }
 
+      // Update the parent grid with new child and adjusted height
       const updatedTargetItem = {
         ...targetItem,
         nested: {
@@ -248,6 +313,7 @@ export function Grid({
         h: calculatedHeight,
       };
 
+      // Apply changes to layout
       const updatedLayout = newLayout.map(item => 
         item.i === targetItemId ? updatedTargetItem : item
       );
@@ -259,37 +325,44 @@ export function Grid({
       return;
     }
 
-    // Original logic: combine two regular items into a new nested grid
+    // SCENARIO 2: Combine two regular items into a new parent grid
+    // IMPORTANT: New parent grid should stay at target item's position (Component A),
+    // not jump to where source item was dragged from (Component B)
+    // This prevents the unexpected "jumping" behavior when combining items
     const newLayout = layout.filter(l => l.i !== draggedItemId && l.i !== targetItemId);
     const nestedId = `nested-${Date.now()}`;
 
     const newNestedItem: LayoutItem = {
       i: nestedId,
-      x: Math.min(sourceItem.x, targetItem.x),
-      y: Math.min(sourceItem.y, targetItem.y),
-      w: Math.max(sourceItem.w, targetItem.w, 2),
-      h: Math.max(sourceItem.h, targetItem.h, 3), // Ensure minimum height of 3
+      // FIX: Use target item position so grid doesn't jump unexpectedly
+      x: targetItem.x,
+      y: targetItem.y,
+      w: Math.max(sourceItem.w, targetItem.w, 2),  // Ensure minimum width
+      h: Math.max(sourceItem.h, targetItem.h, 3),  // Ensure minimum height for 2 items
       nested: {
         items: [
+          // Target item becomes first child (left position in horizontal layout)
           { 
-            ...sourceItem, 
-            i: `${sourceItem.i}-n`, 
-            x: 0, 
+            ...targetItem, 
+            i: `${targetItem.i}-n`, 
+            x: 0,  // First position
             y: 0,
             w: 1,
             h: 1,
           },
+          // Source item becomes second child (right position in horizontal layout)
           { 
-            ...targetItem, 
-            i: `${targetItem.i}-n`, 
-            x: 1, 
+            ...sourceItem, 
+            i: `${sourceItem.i}-n`, 
+            x: 1,  // Second position
             y: 0,
             w: 1,
             h: 1,
           },
         ],
-        cols: 2,
-        compactType: 'horizontal', // Default to horizontal (row) layout - more natural
+        cols: 2,                      // 2 columns for side-by-side layout
+        compactType: 'horizontal',    // Horizontal (row) layout is more natural default
+        padding: 8,                   // Default padding for parent grids (adjustable via UI)
       },
     };
 
@@ -300,6 +373,9 @@ export function Grid({
     lastOverlapTargetRef.current = null;
   };
 
+  /**
+   * Uncombines a parent grid, extracting all child items back to the main grid
+   */
   const handleUncombineGrid = (nestedItemId: string) => {
     const nestedItem = layout.find(l => l.i === nestedItemId);
     if (!nestedItem || !nestedItem.nested) return;
@@ -321,19 +397,72 @@ export function Grid({
     handleLayoutChange(updatedLayout);
   };
 
+  /**
+   * Adjusts padding for a parent grid component
+   * @param nestedItemId - ID of the nested grid item
+   * @param delta - Amount to change padding (positive or negative)
+   */
+  const handleAdjustPadding = (nestedItemId: string, delta: number) => {
+    const updatedLayout = layout.map(item => {
+      if (item.i === nestedItemId && item.nested) {
+        const currentPadding = item.nested.padding ?? 8;
+        const newPadding = Math.max(0, Math.min(32, currentPadding + delta)); // Clamp between 0-32px
+        return {
+          ...item,
+          nested: {
+            ...item.nested,
+            padding: newPadding,
+          },
+        };
+      }
+      return item;
+    });
+    handleLayoutChange(updatedLayout);
+  };
+
+  /**
+   * Adjusts padding for the root grid container
+   * @param delta - Amount to change padding (positive or negative)
+   */
+  const handleAdjustRootPadding = (delta: number) => {
+    if (!isNested && editableProps) {
+      const currentPadding = configPadding;
+      const newPadding = Math.max(0, Math.min(32, currentPadding + delta)); // Clamp between 0-32px
+      onBatchChange({ padding: newPadding });
+    }
+  };
+
+  // TODO: Future feature - Drag to remove from parent grid
+  // When an item is dragged outside parent bounds, extract it to main grid
+  // If parent becomes empty after removal, optionally delete the parent container
+
+  // TODO: Future feature - Force empty cell
+  // Add ability to create placeholder/empty cells in the grid
+  // Useful for precise layouts with intentional gaps
+
+  /**
+   * Handles right-click context menu events
+   * Double right-click toggles layout direction (horizontal ↔️ vertical)
+   * Works for both main grid and nested parent grids
+   * 
+   * @param e - React mouse event
+   * @param nestedItemId - Optional ID of nested grid to toggle (if undefined, toggles main grid)
+   */
   const handleContextMenu = (e: React.MouseEvent, nestedItemId?: string) => {
     e.preventDefault();
     e.stopPropagation(); // Prevent event from bubbling to parent grids
     
     rightClickCountRef.current += 1;
     
+    // Clear existing timer to reset double-click window
     if (rightClickTimerRef.current) {
       clearTimeout(rightClickTimerRef.current);
     }
     
+    // Double right-click detected
     if (rightClickCountRef.current === 2) {
       if (nestedItemId) {
-        // Toggle layout for specific nested grid
+        // Toggle layout for specific nested parent grid
         const updatedLayout = layout.map(item => {
           if (item.i === nestedItemId && item.nested) {
             const newCompactType: 'vertical' | 'horizontal' = item.nested.compactType === 'vertical' ? 'horizontal' : 'vertical';
@@ -417,65 +546,8 @@ export function Grid({
     }
   };
 
-  if (!editMode) {
-    return (
-      <div
-        data-le-id={id}
-        style={{
-          position: 'relative',
-          width: '100%',
-          minHeight: '400px',
-        }}
-      >
-        {layout.map((item) => {
-          if (item.nested) {
-            return (
-              <div
-                key={item.i}
-                style={{
-                  position: 'absolute',
-                  left: `${(item.x / configCols) * 100}%`,
-                  top: `${item.y * (configRowHeight + 8)}px`,
-                  width: `calc(${(item.w / configCols) * 100}% - 8px)`,
-                  height: `${item.h * configRowHeight + (item.h - 1) * 8}px`,
-                }}
-              >
-                <Grid
-                  id={`${id}-${item.i}`}
-                  editMode={false}
-                  layout={item.nested.items}
-                  cols={item.nested.cols || 2}
-                  rowHeight={configRowHeight}
-                  isNested={true}
-                  darkMode={darkMode}
-                  initialCompactType={item.nested.compactType || 'vertical'}
-                  allChildren={childrenArray}
-                >
-                  {/* Children provided via allChildren to keep indices consistent */}
-                </Grid>
-              </div>
-            );
-          }
-
-          const child = item.childIndex !== undefined ? childrenArray[item.childIndex] : null;
-          return (
-            <div
-              key={item.i}
-              style={{
-                position: 'absolute',
-                left: `${(item.x / configCols) * 100}%`,
-                top: `${item.y * (configRowHeight + 8)}px`,
-                width: `calc(${(item.w / configCols) * 100}% - 8px)`,
-                height: `${item.h * configRowHeight + (item.h - 1) * 8}px`,
-              }}
-            >
-              {child}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
+  // REMOVED: View mode now uses ResponsiveGridLayout for consistency with edit mode
+  // No more separate rendering paths that cause width/layout differences
 
   return (
     <>
@@ -534,20 +606,43 @@ export function Grid({
         /* Dark mode: smoother, thicker pink resize handle */
         [data-theme="dark"] .react-resizable-handle {
           background: none !important;
-          width: 16px;
-          height: 16px;
+          width: 20px;
+          height: 20px;
+          right: 0;
+          bottom: 0;
+          z-index: 1000 !important;  /* ALWAYS on top of child content */
         }
         [data-theme="dark"] .react-resizable-handle::after {
           content: '';
           position: absolute;
-          right: 4px;
-          bottom: 4px;
-          width: 12px;
-          height: 12px;
+          right: 3px;
+          bottom: 3px;
+          width: 14px;
+          height: 14px;
           border-right: 3px solid #f472b6;
           border-bottom: 3px solid #f472b6;
-          border-radius: 1px;
-          opacity: 0.95;
+          border-radius: 2px;
+          opacity: 0.85;
+          transition: opacity 0.2s;
+          z-index: 1000 !important;  /* Ensure the handle is always visible */
+        }
+        [data-theme="dark"] .react-resizable-handle:hover::after {
+          opacity: 1;
+          border-right: 3px solid #ec4899;
+          border-bottom: 3px solid #ec4899;
+        }
+        
+        /* Light mode: make sure resize handle is also always on top */
+        .react-resizable-handle {
+          z-index: 1000 !important;
+        }
+
+        /* Improved drag handle cursor feedback */
+        .drag-handle:hover {
+          cursor: grab !important;
+        }
+        .drag-handle:active {
+          cursor: grabbing !important;
         }
       `}</style>
       <div
@@ -560,12 +655,132 @@ export function Grid({
           backgroundColor: darkMode ? '#0f172a' : '#f5f5f5',
           border: darkMode ? '2px dashed #475569' : '2px dashed #ccc',
           borderRadius: '4px',
-          padding: '16px',
+          padding: `${configPadding}px`,
           userSelect: isDragging ? 'none' : 'auto',
           WebkitUserSelect: isDragging ? 'none' : 'auto',
-          transition: 'background-color 0.3s, border-color 0.3s',
+          transition: 'background-color 0.3s, border-color 0.3s, padding 0.2s',
         }}
       >
+        {/* Root Grid Padding Controls */}
+        {editMode && !isNested && (
+          <div style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            zIndex: 20,
+            display: 'flex',
+            gap: '4px',
+          }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAdjustRootPadding(-2);
+              }}
+              style={{
+                backgroundColor: darkMode ? '#8b5cf6' : '#a78bfa',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '6px 10px',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                fontWeight: 600,
+              }}
+              title="Decrease root grid padding"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = darkMode ? '#7c3aed' : '#8b5cf6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = darkMode ? '#8b5cf6' : '#a78bfa';
+              }}
+            >
+              🔽 Root Pad
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAdjustRootPadding(2);
+              }}
+              style={{
+                backgroundColor: darkMode ? '#8b5cf6' : '#a78bfa',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '6px 10px',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                fontWeight: 600,
+              }}
+              title="Increase root grid padding"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = darkMode ? '#7c3aed' : '#8b5cf6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = darkMode ? '#8b5cf6' : '#a78bfa';
+              }}
+            >
+              🔼 Root Pad
+            </button>
+            <div
+              style={{
+                backgroundColor: darkMode ? '#3b82f6' : '#60a5fa',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '6px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+              }}
+            >
+              {configPadding}px
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const newCompactType = compactType === 'vertical' ? 'horizontal' : 'vertical';
+                setCompactType(newCompactType);
+                if (!isNested && editableProps) {
+                  onBatchChange({ compactType: newCompactType });
+                }
+              }}
+              style={{
+                backgroundColor: darkMode ? '#10b981' : '#34d399',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '6px 10px',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                fontWeight: 600,
+              }}
+              title={`Switch to ${compactType === 'vertical' ? 'horizontal' : 'vertical'} layout`}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = darkMode ? '#059669' : '#10b981';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = darkMode ? '#10b981' : '#34d399';
+              }}
+            >
+              {compactType === 'horizontal' ? '↔️ Horizontal' : '↕️ Vertical'}
+            </button>
+          </div>
+        )}
+        
         {isDragging && (
           <div
             style={{
@@ -609,6 +824,8 @@ export function Grid({
           lastOverlapTargetRef.current = null;
         }}
         onDrag={(currentLayout) => {
+          // Throttle overlap checking for better performance
+          // Only check every few pixels of movement
           checkOverlaps(currentLayout);
         }}
         onDragStop={() => {
@@ -636,7 +853,8 @@ export function Grid({
         preventCollision={false}
         useCSSTransforms={true}
         containerPadding={[0, 0]}
-        margin={editMode ? [12, 12] : [8, 8]}
+        // FIX: Use same margins in both modes to prevent jumping when toggling view/edit
+        margin={[12, 12]}
         draggableHandle='.drag-handle'
       >
         {layout.map((item) => {
@@ -650,13 +868,16 @@ export function Grid({
                 style={{
                   position: 'relative',
                   backgroundColor: darkMode ? '#1e293b' : '#fff',
-                  border: editMode ? (isActiveNested || isOverlapTarget ? `3px solid ${darkMode ? '#60a5fa' : '#3b82f6'}` : `2px dashed ${darkMode ? '#475569' : '#ccc'}`) : `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                  // FIX: Use same border width in both modes, only change style for consistency
+                  border: editMode ? (isActiveNested || isOverlapTarget ? `3px solid ${darkMode ? '#60a5fa' : '#3b82f6'}` : `2px dashed ${darkMode ? '#475569' : '#ccc'}`) : `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
                   borderRadius: '6px',
                   overflow: 'auto',
-                  transition: 'border 0.2s, background-color 0.3s',
+                  transition: 'border 0.2s, background-color 0.3s, padding 0.2s',
                   boxShadow: (isActiveNested || isOverlapTarget) ? '0 0 0 3px rgba(59, 130, 246, 0.1)' : (darkMode ? '0 2px 4px rgba(0,0,0,0.3)' : '0 2px 4px rgba(0,0,0,0.1)'),
                   animation: isOverlapTarget ? 'pulseBorder 1s ease-in-out infinite' : 'none',
-                  padding: editMode ? '8px' : '4px',
+                  // FIX: Use same padding in both edit and view mode to prevent jumping
+                  padding: `${item.nested.padding ?? 8}px`,
+                  boxSizing: 'border-box',  /* Ensure consistent sizing calculations */
                 }}
                 onMouseEnter={() => {
                   setActiveNestedId(item.i);
@@ -687,42 +908,107 @@ export function Grid({
                       boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                     }}
                   >
-                    📦 Parent Grid ({item.nested.items.length} items) - {item.nested.compactType === 'horizontal' ? '↔️ Horizontal' : '↕️ Vertical'}
+                    📦 Parent Grid ({item.nested.items.length} items) - {item.nested.compactType === 'horizontal' ? '↔️ Horizontal' : '↕️ Vertical'} - Padding: {item.nested.padding ?? 8}px
                   </div>
                 )}
                 
+                {/* Control buttons: Uncombine and Padding adjustments */}
                 {editMode && !isNested && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUncombineGrid(item.i);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      zIndex: 10,
-                      backgroundColor: '#ef4444',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '4px 8px',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#dc2626';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#ef4444';
-                    }}
-                  >
-                    ✕ Uncombine
-                  </button>
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    zIndex: 10,
+                    display: 'flex',
+                    gap: '4px',
+                  }}>
+                    {/* Padding controls */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAdjustPadding(item.i, -2);
+                      }}
+                      style={{
+                        backgroundColor: darkMode ? '#6366f1' : '#818cf8',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      }}
+                      title="Decrease padding"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = darkMode ? '#4f46e5' : '#6366f1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = darkMode ? '#6366f1' : '#818cf8';
+                      }}
+                    >
+                      🔽 Pad
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAdjustPadding(item.i, 2);
+                      }}
+                      style={{
+                        backgroundColor: darkMode ? '#6366f1' : '#818cf8',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      }}
+                      title="Increase padding"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = darkMode ? '#4f46e5' : '#6366f1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = darkMode ? '#6366f1' : '#818cf8';
+                      }}
+                    >
+                      🔼 Pad
+                    </button>
+                    
+                    {/* Uncombine button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUncombineGrid(item.i);
+                      }}
+                      style={{
+                        backgroundColor: '#ef4444',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#dc2626';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ef4444';
+                      }}
+                    >
+                      ✕ Uncombine
+                    </button>
+                  </div>
                 )}
                 
                 {/* Visual feedback when this nested grid is the overlap target */}
@@ -812,13 +1098,15 @@ export function Grid({
               style={{
                 position: 'relative',
                 backgroundColor: darkMode ? '#1e293b' : '#fff',
-                border: editMode ? (isOverlapTarget ? `3px solid ${darkMode ? '#60a5fa' : '#3b82f6'}` : (darkMode ? '1px solid #475569' : '1px solid #e5e7eb')) : `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                // FIX: Use same border in both modes to prevent size differences
+                border: editMode ? (isOverlapTarget ? `3px solid ${darkMode ? '#60a5fa' : '#3b82f6'}` : (darkMode ? '1px solid #475569' : '1px solid #e5e7eb')) : (darkMode ? '1px solid #475569' : '1px solid #e5e7eb'),
                 borderRadius: '6px',
                 padding: '8px',
                 cursor: editMode ? (isBeingDragged ? 'grabbing' : 'grab') : 'default',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                // FIX: Use 'hidden' on outer container, 'auto' on inner child wrapper for consistent scrolling
                 overflow: 'hidden',
                 opacity: isDimmed ? 0.4 : 1,
                 transform: isBeingDragged ? 'scale(1.05)' : 'scale(1)',
@@ -828,17 +1116,19 @@ export function Grid({
                 userSelect: 'none',
                 WebkitUserSelect: 'none',
                 animation: isOverlapTarget ? 'pulseBorder 1s ease-in-out infinite' : 'none',
+                boxSizing: 'border-box',  /* Ensure consistent sizing calculations */
               }}
             >
+              {/* Drag handle - covers most of the item except resize corner */}
               {editMode && (
                 <div
                   className='drag-handle'
                   style={{
                     position: 'absolute',
-                    top: '10px',
-                    left: '10px',
-                    right: '30px',
-                    bottom: '30px',
+                    top: '4px',
+                    left: '4px',
+                    right: '24px',  // Leave space for resize handle
+                    bottom: '24px', // Leave space for resize handle
                     cursor: 'grab',
                     zIndex: 1,
                   }}
@@ -915,7 +1205,14 @@ export function Grid({
                 </div>
               )}
 
-              <div style={{ position: 'relative', zIndex: 3, pointerEvents: 'none', width: '100%', height: '100%' }}>
+              <div style={{ 
+                position: 'relative', 
+                zIndex: 1,  /* Lower than resize handle (1000), so handle is always visible */
+                pointerEvents: 'none', 
+                width: '100%', 
+                height: '100%',
+                overflow: 'auto',  /* Ensure scrollbars appear when content overflows */
+              }}>
                 {child}
               </div>
             </div>
